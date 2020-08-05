@@ -1,111 +1,150 @@
-import pygame,random
+import pygame
+from pygame.locals import *
 from pygame import *
-from personagem import Personagem
-from background import Background 
-from jogo import Jogo
-from obstaculo import Obstaculo 
-"""Correções
-O programa está dependendo do clique na barra de espaço para gerar e mostrar novos obstaculos e não está detectando corretamente a colisao
-com o personagem
-Na tela final deve aguardar pressionar a tecla de espaço e reiniciar o jogo, resetando todas as posições e variáveis
-"""
-RED = (255,0,0)
-BLUE = (0,0,255)
-GREEN = (0,255,0)
-WHITE = (255,255,255)
-BLACK = (0,0,0)
-DISPLAY_HEIGHT = 720
-DISPLAY_WIDTH = 1280
-GRAVIDADE_PERSONAGEM = 4
-
+from personagem import Person
+from obstaculo import Obstacle
 pygame.init()
-tela_jogo = pygame.display.set_mode((DISPLAY_WIDTH,DISPLAY_HEIGHT))
-pygame.display.set_caption('Angry Runner')
 
-personagem_pula = False
-personagem_principal = Personagem(80,100,200,450,'img/personagem.png')
+class App:
+    def __init__(self):
+        self._WIDTH = 1280
+        self._HEIGHT = 720
+        self.background_image = pygame.image.load('img/background.jpg')
+        self.display = pygame.display.set_mode((self._WIDTH,self._HEIGHT),flags=pygame.RESIZABLE)
+        self.x1 = 0
+        self.x2 = 1280
+        self.speed = 2
+        self.WHITE = (255,255,255)
+        self.speed_increase = 0.05
+        self.personagem = Person()
+        self.obstaculo = Obstacle()
+        self.start_game = False
+        self.clock = pygame.time.Clock()
+        self.colidiu = False
+        self.perdeu = False
+        self.obstacle_rect = pygame.Rect(self.obstaculo.x,self.obstaculo.y, 60,80)
+        self.person_rect = pygame.Rect(self.personagem.x,self.personagem.y, 80,120)
+        self.colisionList = [self.person_rect]
+        self.title = pygame.display.set_caption('Angry Runner v1.0')
+        self.start_background = pygame.image.load('img/start.png')
+        self.gravidade = 15
+        self.pontuacao = 0
+        self.set_icon()
+        self.joga()
 
-mensagem_tela_inicial = 'Bem vindo ao Angry Runner'
-mensagem_pressiona_barra_espaco = 'Aperte a barra de espaço para continuar'
-pygame.font.init()
-fonte_base_titulos = pygame.font.SysFont('arial',50)
-mensagem_tela_inicial_surface = fonte_base_titulos.render(mensagem_tela_inicial,1,(0,0,0))
-fonte_base_subtitulos = pygame.font.SysFont('arial',30)
-mensagem_pressiona_barra_espaco_surface = fonte_base_subtitulos.render(mensagem_pressiona_barra_espaco,1,(0,0,0))
+    def set_icon(self):
+        pygame.display.set_icon(pygame.image.load('img/angry_icon.png'))
 
-jogo = Jogo()
-jogo.limpa_tela(tela_jogo)
-
-
-background_image = pygame.image.load('img/background.jpg').convert()
-
-background_primario = Background(background_image,0,0)
-background_secundario = Background(background_image,1280,0)
-
-pontuacao = 0
-
-obstaculo = Obstaculo()
-obstaculo_selecionado = obstaculo.obstaculo_aleatorio('img/flecha_obstaculo.png','img/stone.png')
-
-tela_final = False
-
-while True:
-    #saída
-    for event in pygame.event.get():
-        if event.type==QUIT:
-            pygame.quit()
-
-
-    if jogo.tela_inicial==False:
-        pontuacao_surface = fonte_base_titulos.render(str(pontuacao),1,(0,0,0))
-        if personagem_principal.colisao(obstaculo,obstaculo.aceleracao)==False:
-            if obstaculo.obstaculo_x <= 0:
-                pontuacao += 1
-                obstaculo.obstaculo_x = 1400
-                obstaculo_selecionado = obstaculo.obstaculo_aleatorio('img/flecha_obstaculo.png','img/stone.png') #Se não houve colisao
-        else:
-            tela_final = True
-
-        tela_jogo.blit(background_image,[background_primario.x,background_primario.y])
-        tela_jogo.blit(background_image,[background_secundario.x,background_secundario.y])
-        tela_jogo.blit(pontuacao_surface,[500,100])
-        tela_jogo.blit(obstaculo_selecionado,[obstaculo.obstaculo_x,obstaculo.obstaculo_y])
-        obstaculo.move_obstaculo(0.0005)
-        background_primario.move_left(1)
-        background_secundario.move_left(1)
-        personagem_principal.mostra_na_tela(tela_jogo,personagem_principal.x_personagem,personagem_principal.y_personagem)
+    def quit_display(self):
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
     
+    def update(self):
+        pygame.display.flip()
 
-        if background_primario.x + 1280 <= 0:
-            background_primario.x = 1280
-        elif background_secundario.x + 1280 <= 0:
-            background_secundario.x = 1280
-        
-        teclas_pressionadas = pygame.key.get_pressed()
-        if teclas_pressionadas[K_SPACE]==1 or teclas_pressionadas[K_UP]==1:
-            personagem_pula = True
+    def update_back(self):
+        self.display.blit(self.background_image,[self.x1,0])
+        self.display.blit(self.background_image,[self.x2,0])
 
-        personagem_principal.pula_personagem(personagem_pula,10,300)
+    def move_back(self):
+        self.speed += self.speed_increase
+        self.x1 -= self.speed
+        self.x2 -= self.speed
+        if self.x1 < -1279:
+            self.x1 = 1280
+        if self.x2 < -1279:
+            self.x2 = 1280
 
-        if personagem_principal.y_personagem < 450:
-            personagem_principal.y_personagem += GRAVIDADE_PERSONAGEM
-        
-        personagem_pula = False
+    def joga(self):
+        while True:
+            self.tick = self.clock.tick(30)
+            if self.start_game == False and self.perdeu == False:
+                self.start_screen()
+            elif self.start_game == True and self.perdeu== True:
+                self.restart_screen()
+            elif self.start_game:
+                self.update_back()
+                self.update_person()
+                self.update_obstacle()
+                self.move_obstacle()
+                self.move_back()
+                self.pula()
+                self.cai()
+               # self.pontuacao_aumenta()
+                self.gera_texto(str(self.pontuacao),50,630,40)
+                self.colisao()
+            self.quit_display()
+            self.update()
 
-    
-    elif tela_final ==True:
-        jogo.limpa_tela(tela_jogo)
-        pontuacao_final_surface = fonte_base_titulos.render('Sua pontuacao foi de {}'.format(str(pontuacao)),1,(0,0,0))
-        tela_jogo.blit(pontuacao_final_surface,[400,100])
-    
-    elif jogo.tela_inicial:
-        tela_jogo.blit(mensagem_tela_inicial_surface,[350,100])
-        tela_jogo.blit(mensagem_pressiona_barra_espaco_surface,[420,400])
+    def update_person(self):
+        self.display.blit(self.personagem.image,[self.personagem.x,self.personagem.y])
 
-        teclas_pressionadas = pygame.key.get_pressed()
-        if teclas_pressionadas[K_SPACE]==1:
-            jogo.tela_inicial = False
-    
-    pygame.display.flip()
+    def captura_pulo(self):
+        teclas = pygame.key.get_pressed()
+        if teclas[K_UP]==1 or teclas[K_SPACE]==1:
+            return True    
+        return False
 
-    
+    def start_screen(self):
+        self.display.blit(self.start_background,[0,0])
+        teclas = pygame.key.get_pressed()
+        if teclas[K_SPACE]==1 or teclas[K_UP]==1:
+            self.start_game = True
+
+    def gera_texto(self,texto,tamanho,x,y):
+        pygame.font.init()
+        base = pygame.font.SysFont('arial',tamanho)
+        surface = base.render(texto,1,(255,255,255))
+        self.display.blit(surface,[x,y])
+
+    def cai(self):
+        if self.personagem.y < 455:
+            self.personagem.y += self.gravidade
+
+    def pula(self):
+        if self.captura_pulo() and self.personagem.y > 280:
+            self.personagem.y -= 40
+
+    def update_obstacle(self):
+        self.obstacle_rect = pygame.Rect(self.obstaculo.x,self.obstaculo.y, 50,75)
+        self.person_rect = pygame.Rect(self.personagem.x,self.personagem.y, 80,120)
+        self.display.blit(self.obstaculo.image,[self.obstaculo.x,self.obstaculo.y])
+
+    def move_obstacle(self):
+        self.obstaculo.rect.move_ip(self.obstaculo.speed,0)
+        self.obstaculo.speed += self.obstaculo.speed_increase
+        self.obstaculo.x -= self.obstaculo.speed
+        if self.obstaculo.x < -40:
+            self.pontuacao += 1
+            self.obstaculo.x = 1300
+
+    def colisao(self):
+        if  self.obstacle_rect.collidelist(self.colisionList) >= 0 and self.personagem.y > 350:
+            self.perdeu = True
+            self.colidiu = True
+
+    def restart_screen(self):
+        if self.colidiu:
+            self.display.fill((0,0,0))
+            self.gera_texto('Game Over Boy',50,500,300)
+            tela_over = pygame.image.load('img/over.jpg')
+            self.display.blit(tela_over,[0,0])
+            self.gera_texto('Press space or up to restart',30,450,500)
+            self.gera_texto('Você fez '+ str(self.pontuacao)+' ponto(s)',30,500,600)
+        teclas = pygame.key.get_pressed()
+        if teclas[K_SPACE]==1 or teclas[K_UP]==1:
+            self.colidiu = False
+            self.obstaculo.x = 1300
+            self.obstaculo.speed_increase = 0.05
+            self.perdeu = False          
+            self.pontuacao = 0  
+            self.speed_increase = 0.05
+            self.speed = 2
+            self.obstaculo.speed = 2
+
+    #def pontuacao_aumenta(self):
+     #   if self.colidiu ==False and self.obstaculo.x < self.personagem.x:
+      #      self.pontuacao += 1
+
+App()

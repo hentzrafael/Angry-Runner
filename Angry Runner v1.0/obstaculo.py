@@ -7,7 +7,7 @@ class Obstacle():
         pygame.sprite.Sprite().__init__()
         self.x = 1300
         self.y = 470
-        self.image = pygame.image.load('img/stone.png')
+        self.image = pygame.image.load('img/pig.png')
         self.speed = 2
         self.rect = self.image.get_rect()
         self.speed_increase = 0.05
